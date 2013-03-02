@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<site>
+   <description name="Birt MongoDB">
+      Support for MongoDB in BIRT
+   </description>
+   <feature url="features/org.eclipse.birt.report.data.oda.mongodb.feature_1.1.0.201303021820.jar" id="org.eclipse.birt.report.data.oda.mongodb.feature" version="1.1.0.201303021820"/>
+   <category-def name="birt.oda.mongodb" label="MongoDB BIRT ODA Support">
+      <description>
+         Support for MongoDB in BIRT
+      </description>
+   </category-def>
+</site>

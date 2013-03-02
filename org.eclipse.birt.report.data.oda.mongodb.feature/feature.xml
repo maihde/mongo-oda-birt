@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feature
+      id="org.eclipse.birt.report.data.oda.mongodb.feature"
+      label="Mongodb Data Source ODA Runtime Driver"
+      version="1.1.0.qualifier">
+
+   <description>
+      Support for MongoDB in BIRT
+   </description>
+
+   <copyright>
+      Copyright 2010-2011 (C) Pulak Bose
+Copyright 2013 (C) Michael Ihde
+   </copyright>
+
+   <license url="http://www.eclipse.org/legal/epl-v10.html">
+      Eclipse Public License Version 1.0
+   </license>
+
+   <requires>
+      <import plugin="org.eclipse.core.runtime"/>
+      <import plugin="org.eclipse.datatools.connectivity.oda" version="3.3.0" match="compatible"/>
+      <import plugin="org.eclipse.datatools.connectivity.oda.profile" version="3.2.0" match="compatible"/>
+      <import plugin="org.eclipse.ui"/>
+      <import plugin="org.eclipse.datatools.connectivity.oda.design.ui" version="3.2.0" match="compatible"/>
+   </requires>
+
+   <plugin
+         id="org.eclipse.birt.report.data.oda.mongodb"
+         download-size="0"
+         install-size="0"
+         version="0.0.0"
+         unpack="false"/>
+
+   <plugin
+         id="org.eclipse.birt.report.data.oda.mongodb.ui"
+         download-size="0"
+         install-size="0"
+         version="0.0.0"
+         unpack="false"/>
+
+</feature>
