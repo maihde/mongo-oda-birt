@@ -50,7 +50,6 @@
             </property>
          </properties>
          <traceLogging
-               logDirectory="C:\temp\"
                logFileNamePrefix="mongo_oda_log"
                logLevel="WARNING">
          </traceLogging>
