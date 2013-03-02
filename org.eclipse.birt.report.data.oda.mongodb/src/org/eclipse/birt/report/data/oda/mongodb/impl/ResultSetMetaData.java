@@ -9,11 +9,15 @@ package org.eclipse.birt.report.data.oda.mongodb.impl;
 
 import java.sql.Types;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Set;
 
 import org.eclipse.datatools.connectivity.oda.IResultSetMetaData;
 import org.eclipse.datatools.connectivity.oda.OdaException;
 
+import com.mongodb.BasicDBList;
+import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
 
 /**
@@ -23,51 +27,33 @@ public class ResultSetMetaData implements IResultSetMetaData {
 	private List<String> colHeaders = new ArrayList<String>();
 	private List<Integer> colDataType = new ArrayList<Integer>();
 
-	public ResultSetMetaData(DBObject metadataObject, List<String> selectColumns) {
+	public ResultSetMetaData(DBObject metadataObject, Set<String> selectColumns) {
 
-		boolean allColumns = false;
-		if (selectColumns.size() == 0) {
-			allColumns = true; //all columns need to be selected
+		if ((selectColumns == null) || (selectColumns.size() == 0)) {
+			selectColumns = metadataObject.keySet();
 		}
 		
 		//Iterate the metadata object (first row in the collection) and determine column name, data type
-		for (String keyField : metadataObject.keySet()) {
-			if (allColumns || selectColumns.contains(keyField)) {
-				colHeaders.add(keyField);
-				Integer dataType = getDataType(metadataObject.get(keyField)
-						.toString());
-				colDataType.add(dataType);
-			}
+		for (String keyField : selectColumns) {
+			colHeaders.add(keyField);
+			Integer dataType = getDataType(metadataObject.get(keyField));
+			colDataType.add(dataType);
 		}
 	}
 
-	private Integer getDataType(String sampleValue) {
-
-		// TODO Uncomment the following if Date data type support is needed.
-		/*
-		 * try { DateFormat df = new SimpleDateFormat(); Date td =
-		 * df.parse(sampleValue); return Types.DATE; } catch (ParseException e1)
-		 * {// }
-		 */
-
-		// Not a date, check if it is a number
-		if (sampleValue.indexOf('.') > 0) {
-			try {
-				@SuppressWarnings("unused")
-				Double tDbl = new Double(sampleValue);
-				return Types.DOUBLE;
-			} catch (NumberFormatException e) { // do nothing it is not a number
-			}
+	private Integer getDataType(Object sampleValue) {
+		if (sampleValue == null) {
+			return Types.CHAR; // assume string, the user can always override it
 		}
-
-		try {
-			@SuppressWarnings("unused")
-			Integer tInt = new Integer(sampleValue);
+		
+		if (sampleValue instanceof Date) {
+			return Types.DATE;
+		} else if (sampleValue instanceof Double) {
+			return Types.DOUBLE;
+		} else if (sampleValue instanceof Integer) {
 			return Types.INTEGER;
-		} catch (NumberFormatException e) {
-			// Wasn't an Integer must be a String
-			return Types.CHAR;
 		}
+		return Types.CHAR;
 	}
 
 	/*

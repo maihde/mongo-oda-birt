@@ -97,6 +97,28 @@
                odaScalarDataType="Boolean"
                nativeDataType="Boolean">
          </dataTypeMapping>
+         <properties>
+            <property
+                  allowsEmptyValueAsNull="true"
+                  canInherit="true"
+                  defaultDisplayName="Filter"
+                  isEncryptable="false"
+                  name="FilterCriteria"
+                  type="string">
+            </property>
+            <property
+                  allowsEmptyValueAsNull="true"
+                  canInherit="true"
+                  defaultDisplayName="Sort"
+                  isEncryptable="false"
+                  name="SortCriteria"
+                  type="string">
+            </property>
+            <propertyVisibility
+                  name="queryText"
+                  visibility="hide">
+            </propertyVisibility>
+         </properties>
       </dataSet>
    </extension>
    <extension

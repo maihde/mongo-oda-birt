@@ -34,11 +34,13 @@ public class ResultSet implements IResultSet
     private IResultSetMetaData resultSetMetaData;
     private DBCursor cursor;
     private DBObject curRow;
+    private boolean wasNull;
     
-    public ResultSet(DBCursor cursor,DBObject metadataObject,List<String> selectColumns)
+    public ResultSet(DBCursor cursor, IResultSetMetaData resultSetMetaData)
     {	
     	this.cursor = cursor;
-    	resultSetMetaData = new ResultSetMetaData(metadataObject, selectColumns);    	
+    	this.resultSetMetaData = resultSetMetaData;
+    	this.wasNull = false;
     }
     
 	/*
@@ -55,6 +57,9 @@ public class ResultSet implements IResultSet
 	public void setMaxRows( int max ) throws OdaException
 	{
 		m_maxRows = max;
+		if (m_maxRows > 0) {
+		    this.cursor = this.cursor.limit(m_maxRows);
+		}
 	}
 	
 	/**
@@ -117,6 +122,7 @@ public class ResultSet implements IResultSet
 	public String getString( String columnName ) throws OdaException
 	{
 		Object value = curRow.get(columnName); 
+		wasNull = (value == null);
         return (value==null)? "" : value.toString();
 	}
 
@@ -134,7 +140,8 @@ public class ResultSet implements IResultSet
 	 */
 	public int getInt( String columnName ) throws OdaException
 	{
-		Object value = curRow.get(columnName); 
+		Object value = curRow.get(columnName);
+		wasNull = (value == null);
 		try
 		{
 			return (value==null)? 0 : new Integer(value.toString());
@@ -160,7 +167,8 @@ public class ResultSet implements IResultSet
 	 */
 	public double getDouble( String columnName ) throws OdaException
 	{
-		Object value = curRow.get(columnName); 
+		Object value = curRow.get(columnName);
+		wasNull = (value == null);
         try
         {
 		return (value==null)? 0.0 : new Double(value.toString());
@@ -202,8 +210,18 @@ public class ResultSet implements IResultSet
 	 */
 	public Date getDate( String columnName ) throws OdaException
 	{
+		if (curRow.get(columnName) == null) {
+			wasNull = true;
+			return null;
+		}
+
 		try {
-			return new java.sql.Date(new SimpleDateFormat().parse(curRow.get(columnName).toString()).getTime());
+			
+			if (curRow.get(columnName) instanceof java.util.Date) {
+				return new java.sql.Date(((java.util.Date) curRow.get(columnName)).getTime());
+			} else {
+			    return new java.sql.Date(new SimpleDateFormat().parse(curRow.get(columnName).toString()).getTime());
+			}
 		} catch (ParseException e) {
 			throw new UnsupportedOperationException();
 		}
@@ -316,8 +334,7 @@ public class ResultSet implements IResultSet
      */
     public boolean wasNull() throws OdaException
     {
-        // TODO Auto-generated method stub
-        return false;
+        return wasNull;
     }
 
     /*

@@ -123,7 +123,7 @@ public class DataSetMetaData implements IDataSetMetaData
 	public boolean supportsNamedParameters() throws OdaException
 	{
         // TODO Auto-generated method stub
-		return false;
+		return true;
 	}
 
 	/*

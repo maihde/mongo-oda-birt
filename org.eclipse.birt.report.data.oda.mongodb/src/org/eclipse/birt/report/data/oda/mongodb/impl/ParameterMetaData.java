@@ -22,12 +22,26 @@ import org.eclipse.datatools.connectivity.oda.OdaException;
 public class ParameterMetaData implements IParameterMetaData 
 {
 
+	private int m_parameterCount;
+
+	public ParameterMetaData() {
+		this(true);
+	}
+	
+	public ParameterMetaData(boolean legacy_mode) {
+		super();
+		m_parameterCount = 0;
+		if (legacy_mode) {
+		    m_parameterCount = 2; //Filter and sort clause
+		}
+	}
+
 	/* 
 	 * @see org.eclipse.datatools.connectivity.oda.IParameterMetaData#getParameterCount()
 	 */
 	public int getParameterCount() throws OdaException 
 	{
-        return 2; //Filter and sort clause
+        return m_parameterCount;
 	}
 
     /*
@@ -44,8 +58,12 @@ public class ParameterMetaData implements IParameterMetaData
      */
     public String getParameterName( int param ) throws OdaException
     {
-        // TODO Auto-generated method stub
-        return null;    // name is not available
+    	if (param == 1) {
+            return "FilterCriteria";
+		} else if (param == 2) {
+            return "SortCriteria";
+		}
+    	return null;
     }
 
 	/* 
