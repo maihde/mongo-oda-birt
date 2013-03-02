@@ -52,7 +52,7 @@
          <traceLogging
                logDirectory="C:\temp\"
                logFileNamePrefix="mongo_oda_log"
-               logLevel="FINEST">
+               logLevel="WARNING">
          </traceLogging>
       </dataSource>
       <dataSet
