@@ -44,7 +44,9 @@ import org.eclipse.swt.widgets.Text;
 public class CustomDataSetWizardPage extends DataSetWizardPage
 {
 
-    private static String DEFAULT_MESSAGE = "Define the query text for the data set";
+    private static final String DEFAULT_QUERY_TEXT = "db.<collection>.find()";
+
+	private static String DEFAULT_MESSAGE = "Define the MongoDB query for the data set";
     
     private transient Text m_queryTextField;
 
@@ -94,7 +96,7 @@ public class CustomDataSetWizardPage extends DataSetWizardPage
         composite.setLayoutData( gridData );
 
         Label fieldLabel = new Label( composite, SWT.NONE );
-        fieldLabel.setText( "&Query Text:" );
+        fieldLabel.setText( "&Query:" );
         
         m_queryTextField = new Text( composite, SWT.BORDER
                 | SWT.V_SCROLL | SWT.H_SCROLL );
@@ -133,7 +135,11 @@ public class CustomDataSetWizardPage extends DataSetWizardPage
             return; // nothing to initialize
 
         // initialize control
-        m_queryTextField.setText( queryText );
+        if ((queryText != null) && (queryText.trim().length() > 0)) {
+            m_queryTextField.setText( queryText );
+        } else {
+        	m_queryTextField.setText( DEFAULT_QUERY_TEXT );
+        }
         validateData();
         setMessage( DEFAULT_MESSAGE );
 
@@ -201,10 +207,15 @@ public class CustomDataSetWizardPage extends DataSetWizardPage
         boolean isValid = ( m_queryTextField != null &&
             getQueryText() != null && getQueryText().trim().length() > 0 );
 
-        if( isValid )
-            setMessage( DEFAULT_MESSAGE );
-        else
+        if( isValid ) {
+        	if ( getQueryText().startsWith("db.")) {
+        		setMessage( DEFAULT_MESSAGE );
+        	} else {
+        		setMessage( "It is recommend that you provide a standard MongoDB query expression", WARNING );
+        	}
+        } else {
             setMessage( "Requires input value.", ERROR );
+        }
 
 		setPageComplete( isValid );
 	}
