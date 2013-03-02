@@ -23,17 +23,17 @@ For example, to query all elements in the dataset use:
 
     db.zips.find()
 
-![ScreenShot](http://raw.github.com/maihde/mongo-oda-birt/master/screenshots/screenshot001.png)
+![ScreenShot](https://github.com/maihde/mongo-oda-birt/raw/master/screenshots/screenshot001.png)
 
 But you can perform filtering on the server:
 
     db.zips.find({state: "IA"})
 
-![ScreenShot](http://raw.github.com/maihde/mongo-oda-birt/master/screenshots/screenshot002.png)
+![ScreenShot](https://github.com/maihde/mongo-oda-birt/raw/master/screenshots/screenshot002.png)
 
 This can be benefical/necessary on very large databases.
 
-![ScreenShot](http://raw.github.com/maihde/mongo-oda-birt/master/screenshots/screenshot003.png)
+![ScreenShot](https://github.com/maihde/mongo-oda-birt/raw/master/screenshots/screenshot003.png)
 
 All valid MongoDB query statements should be supported, see the [MongoDB
 Guide](http://docs.mongodb.org/manual/core/read-operations/) for further
@@ -49,11 +49,11 @@ limit the returned columns.  For example:
     
     db.zips.find({state: "IA"}, {"city": 1, "pop": 1})
 
-![ScreenShot](http://raw.github.com/maihde/mongo-oda-birt/master/screenshots/screenshot004.png)
+![ScreenShot](https://github.com/maihde/mongo-oda-birt/raw/master/screenshots/screenshot004.png)
 
 Will produce:
 
-![ScreenShot](http://raw.github.com/maihde/mongo-oda-birt/master/screenshots/screenshot005.png)
+![ScreenShot](https://github.com/maihde/mongo-oda-birt/raw/master/screenshots/screenshot005.png)
 
 To use a projection without a filter, use this syntax:
     
@@ -74,7 +74,7 @@ connecting to: test
 
 The new columns will now be available in your data-set.
 
-![ScreenShot](http://raw.github.com/maihde/mongo-oda-birt/master/screenshots/screenshot006.png)
+![ScreenShot](https://github.com/maihde/mongo-oda-birt/raw/master/screenshots/screenshot006.png)
 
 Easier Access to FilterCriteria and SortCriteria
 ================================================
@@ -99,7 +99,7 @@ used if you define a query with the legacy syntax.
 
 Now you can specify these criteria as properties:
 
-![ScreenShot](http://raw.github.com/maihde/mongo-oda-birt/master/screenshots/screenshot007.png)
+![ScreenShot](https://github.com/maihde/mongo-oda-birt/raw/master/screenshots/screenshot007.png)
 
 A simple criteria can look like this:
 
@@ -121,11 +121,11 @@ Although more verbose, it's better to define your FilterCriteria in this manner.
     }
     filter.toSource()
 
-![ScreenShot](http://raw.github.com/maihde/mongo-oda-birt/master/screenshots/screenshot008.png)
+![ScreenShot](https://github.com/maihde/mongo-oda-birt/raw/master/screenshots/screenshot008.png)
 
 Results in:
 
-![ScreenShot](http://raw.github.com/maihde/mongo-oda-birt/master/screenshots/screenshot009.png)
+![ScreenShot](https://github.com/maihde/mongo-oda-birt/raw/master/screenshots/screenshot009.png)
 
 IMPORTANT: If you specify a FilterCriteria property value, the filter criteria
 (if any) specified in the original query is ignored.  In legacy mode, the
@@ -134,7 +134,7 @@ FilterCriteria parameter has higher priority than the FilterCriteria property.
 SortCriteria can be specified in the same manner.  For example, to create a static sort (note that
 the critera field was set to be a constant instead of a JavaScript expression).  
 
-![ScreenShot](http://raw.github.com/maihde/mongo-oda-birt/master/screenshots/screenshot010.png)
+![ScreenShot](https://github.com/maihde/mongo-oda-birt/raw/master/screenshots/screenshot010.png)
 
 Inferred Data-types Follow Types in the Database
 ================================================
