@@ -233,7 +233,8 @@ public class ResultSet implements IResultSet
 	public Time getTime( int index ) throws OdaException
 	{
         // TODO Auto-generated method stub
-        throw new UnsupportedOperationException();
+		String colName = this.resultSetMetaData.getColumnName(index);
+		return getTime(colName);
 	}
 
 	/*
@@ -241,7 +242,21 @@ public class ResultSet implements IResultSet
 	 */
 	public Time getTime( String columnName ) throws OdaException
 	{
-		throw new UnsupportedOperationException();
+		if (curRow.get(columnName) == null) {
+			wasNull = true;
+			return null;
+		}
+
+		try {
+			
+			if (curRow.get(columnName) instanceof java.util.Date) {
+				return new java.sql.Time(((java.util.Date) curRow.get(columnName)).getTime());
+			} else {
+			    return new java.sql.Time(new SimpleDateFormat().parse(curRow.get(columnName).toString()).getTime());
+			}
+		} catch (ParseException e) {
+			throw new UnsupportedOperationException();
+		}
 	}
 
 	/*
@@ -250,7 +265,8 @@ public class ResultSet implements IResultSet
 	public Timestamp getTimestamp( int index ) throws OdaException
 	{
         // TODO Auto-generated method stub
-        throw new UnsupportedOperationException();
+		String colName = this.resultSetMetaData.getColumnName(index);
+		return getTimestamp(colName);
 	}
 
 	/*
@@ -258,7 +274,21 @@ public class ResultSet implements IResultSet
 	 */
 	public Timestamp getTimestamp( String columnName ) throws OdaException
 	{
-		throw new UnsupportedOperationException();
+		if (curRow.get(columnName) == null) {
+			wasNull = true;
+			return null;
+		}
+
+		try {
+			
+			if (curRow.get(columnName) instanceof java.util.Date) {
+				return new java.sql.Timestamp(((java.util.Date) curRow.get(columnName)).getTime());
+			} else {
+			    return new java.sql.Timestamp(new SimpleDateFormat().parse(curRow.get(columnName).toString()).getTime());
+			}
+		} catch (ParseException e) {
+			throw new UnsupportedOperationException();
+		}
 	}
 
     /* 

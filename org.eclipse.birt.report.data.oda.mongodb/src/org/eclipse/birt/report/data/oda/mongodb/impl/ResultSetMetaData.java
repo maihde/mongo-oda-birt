@@ -47,7 +47,7 @@ public class ResultSetMetaData implements IResultSetMetaData {
 		}
 		
 		if (sampleValue instanceof Date) {
-			return Types.DATE;
+			return Types.TIMESTAMP;
 		} else if (sampleValue instanceof Double) {
 			return Types.DOUBLE;
 		} else if (sampleValue instanceof Integer) {
