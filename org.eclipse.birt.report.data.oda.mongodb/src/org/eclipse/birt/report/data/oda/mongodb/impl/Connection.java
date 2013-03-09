@@ -8,6 +8,7 @@
 package org.eclipse.birt.report.data.oda.mongodb.impl;
 
 import java.util.Properties;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -153,6 +154,10 @@ public class Connection implements IConnection {
 	 */
 	public void setLocale(ULocale locale) throws OdaException {
 		// do nothing; assumes no locale support
+	}
+
+	public DB getDB() {
+		return this.db;
 	}
 
 }

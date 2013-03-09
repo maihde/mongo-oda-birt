@@ -15,6 +15,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -33,6 +35,7 @@ import com.mongodb.DB;
 import com.mongodb.DBCollection;
 import com.mongodb.DBCursor;
 import com.mongodb.DBObject;
+import com.mongodb.MapReduceCommand;
 import com.mongodb.MapReduceOutput;
 import com.mongodb.util.JSON;
 
@@ -47,7 +50,7 @@ public class Query implements IQuery {
 	private String m_preparedText;
 	private DB db = null;
 
-	List<String> selectColumns = null;
+	Set<String> selectColumns = null;
 	
 	private DBCursor cursor = null;
 	private DBObject metadataObject = null;
@@ -63,6 +66,9 @@ public class Query implements IQuery {
 	private DBObject sortClause;
 
 	private QuerySpecification querySpec;
+	private IResultSetMetaData cachedResultMetaData;
+
+	private String defaultProjection;
 	
 	public Query(DB db) {
 		this.db = db;
@@ -75,15 +81,23 @@ public class Query implements IQuery {
 	public void setSortClause(String sortClause) {
 		this.sortClause = (DBObject) JSON.parse(sortClause);
 	}
+	
+
+	public void setDefaultProjection(String value) {
+		this.defaultProjection = value;
+	}
 
 	/*
 	 * @see
 	 * org.eclipse.datatools.connectivity.oda.IQuery#prepare(java.lang.String)
 	 */
 	public void prepare(String queryText) throws OdaException {
+		// Clear the cached metadataObject
+		this.metadataObject = null;
+		
 		try {
 			m_preparedText = queryText.trim();
-			selectColumns = new ArrayList<String>();
+			selectColumns = new HashSet<String>();
 			
 			if (m_preparedText.startsWith("db.")) {
 				int find_index = m_preparedText.indexOf(".find(");
@@ -139,14 +153,17 @@ public class Query implements IQuery {
 					throw new OdaException(Messages.getString("query_INVALID_METADATA"));
 				}
 				
-				// If the user didn't provide a projection-clause, then grab all columns
-				if (projectionClause == null) {
-					// Get the list of all columns in the database
-					MapReduceOutput mro = collection.mapReduce("function() { for (var key in this) { emit(key, null); } }",
-							                                   "function(key, stuff) { return null; }",
-							                                   "{out: {inline: 1}}",
-							                                   null);
-					selectColumns = mro.getOutputCollection().distinct("_id");
+				// If the user didn't provide a projection-clause and the default is set to "all" then grab all columns
+				if ((projectionClause == null) && ("all".equals(defaultProjection))) {
+					MapReduceOutput mro = collection.mapReduce(
+							"function() { for (var key in this) { emit(key, null); } }",
+		                    "function(key, stuff) { return null; }",
+		                    null,
+		                    MapReduceCommand.OutputType.INLINE,
+		                    null);
+					for ( DBObject obj : mro.results() ) {
+						selectColumns.add(obj.get("_id").toString());
+					}
 				}
 			} else {
 				legacyPrepare(queryText);
@@ -181,14 +198,19 @@ public class Query implements IQuery {
 
 		metadataObject = collection.findOne(); //Get the first row to help determine the data types
 		if (queryStringArray.length > 1) { //Check whether further tokens exists in the query text
-			selectColumns = Arrays.asList( queryStringArray[1].split(",")); //Split again to get the select column names
+			selectColumns = new HashSet(Arrays.asList( queryStringArray[1].split(","))); //Split again to get the select column names
 		} else {
-			// Get the list of all columns in the database
-			MapReduceOutput mro = collection.mapReduce("function() { for (var key in this) { emit(key, null); } }",
-					                                   "function(key, stuff) { return null; }",
-					                                   "{out: {inline: 1}}",
-					                                   null);
-			selectColumns = mro.getOutputCollection().distinct("_id");
+			if ((projectionClause == null) && ("all".equals(defaultProjection))) {
+				MapReduceOutput mro = collection.mapReduce(
+						"function() { for (var key in this) { emit(key, null); } }",
+	                    "function(key, stuff) { return null; }",
+	                    null,
+	                    MapReduceCommand.OutputType.INLINE,
+	                    null);
+				for ( DBObject obj : mro.results() ) {
+					selectColumns.add(obj.get("_id").toString());
+				}
+			}
 		}
 		
 		if (metadataObject == null)
@@ -259,7 +281,45 @@ public class Query implements IQuery {
 	 * , java.lang.String)
 	 */
 	public void setProperty(String name, String value) throws OdaException {
-		// do nothing; assumes no data set query property
+		if ("FilterCriteria".equals(name)) {
+			if ((value != null) && (value.trim().length() > 0)) {
+				String filterCriteria = value.trim();
+				try {
+					if (filterCriteria.startsWith("(") && filterCriteria.endsWith(")")) {
+						filterCriteria = filterCriteria.substring(1, filterCriteria.length()-1);
+					}
+					filterClause = (DBObject) JSON.parse(filterCriteria);
+				} catch (RuntimeException e) {
+					throw new OdaException(Messages.getString("query_INVALID_FILTERCRITERIA"));
+				}
+			} else {
+				filterClause = null;
+			}
+		}
+		
+		if ("SortCriteria".equals(name)) {
+			if ((value != null) && (value.trim().length() > 0)) {
+				String sortCriteria = value.trim();
+				try {
+					if (sortCriteria.startsWith("(") && sortCriteria.endsWith(")")) {
+						sortCriteria = sortCriteria.substring(1, sortCriteria.length()-1);
+					}
+					sortClause = (DBObject) JSON.parse(sortCriteria);
+				} catch (RuntimeException e) {
+					throw new OdaException(Messages.getString("query_INVALID_SORTCRITERIA"));
+				}
+			} else {
+				sortClause = defaultSortClause;
+			}
+		}
+		
+		if ("DefaultProjection".equals(name)) {
+			if ((value != null) && (value.trim().length() > 0)) {
+				setDefaultProjection(value.trim());
+			} else {
+				defaultProjection = null;
+			}
+		}
 	}
 
 	/*
@@ -354,15 +414,13 @@ public class Query implements IQuery {
 		if (value == null)
 			return;
 
-        if (legacyMode) {
-			if (parameterName.equals("FilterCriteria")) //Where clause parameter
-				setFilterClause(value);
+        if (parameterName.equals("FilterCriteria")) //Where clause parameter
+			setFilterClause(value);
 	
-			if (parameterName.equals("SortCriteria")) //Sort clause parameter
-				setSortClause(value);
-        }
+		if (parameterName.equals("SortCriteria")) //Sort clause parameter
+			setSortClause(value);
 	}
-
+	
 	/*
 	 * @see org.eclipse.datatools.connectivity.oda.IQuery#setString(int,
 	 * java.lang.String)
@@ -558,37 +616,16 @@ public class Query implements IQuery {
 	public void setSpecification(QuerySpecification querySpec)
 			throws OdaException, UnsupportedOperationException {
 		this.querySpec = querySpec;
-		
-		if ((querySpec.getProperty("FilterCriteria") != null) && (querySpec.getProperty("FilterCriteria").toString().trim().length() > 0)) {
-			String filterCriteria = querySpec.getProperty("FilterCriteria").toString().trim();
-			try {
-				if (filterCriteria.startsWith("(") && filterCriteria.endsWith(")")) {
-					filterCriteria = filterCriteria.substring(1, filterCriteria.length()-1);
-				}
-				filterClause = (DBObject) JSON.parse(filterCriteria);
-			} catch (RuntimeException e) {
-				throw new OdaException(Messages.getString("query_INVALID_FILTERCRITERIA"));
+		for (Entry<String, Object> prop : this.querySpec.getProperties().entrySet()) {
+			if (prop.getValue() == null) {
+				this.setProperty(prop.getKey(), null);
+			} else {
+				this.setProperty(prop.getKey(), prop.getValue().toString());
 			}
-		} else {
-			filterClause = null;
-		}
-		
-		if ((querySpec.getProperty("SortCriteria") != null) && (querySpec.getProperty("SortCriteria").toString().trim().length() > 0)) {
-			String sortCriteria = querySpec.getProperty("SortCriteria").toString();
-			try {
-				if (sortCriteria.startsWith("(") && sortCriteria.endsWith(")")) {
-					sortCriteria = sortCriteria.substring(1, sortCriteria.length()-1);
-				}
-				sortClause = (DBObject) JSON.parse(sortCriteria);
-			} catch (RuntimeException e) {
-				throw new OdaException(Messages.getString("query_INVALID_SORTCRITERIA"));
-			}
-		} else {
-			sortClause = defaultSortClause;
 		}
 		
 		if (legacyMode) {
-			if (querySpec.getParameterValue(1) != null) {
+			if ((querySpec.getParameterValue(1) != null) && (!querySpec.getParameterValue(1).equals("{}"))) {
 				String filterCriteria = querySpec.getParameterValue(1).toString().trim();
 				try {
 				    filterClause = (DBObject) JSON.parse(filterCriteria);
@@ -596,7 +633,7 @@ public class Query implements IQuery {
 					throw new OdaException(Messages.getString("query_INVALID_FILTERCRITERIA"));
 				}  
 			}
-			if (querySpec.getParameterValue(2) != null) {
+			if ((querySpec.getParameterValue(2) != null) && (!querySpec.getParameterValue(2).equals("{}"))) {
 				String sortCriteria = querySpec.getParameterValue(2).toString();
 				try {
 				    filterClause = (DBObject) JSON.parse(sortCriteria);

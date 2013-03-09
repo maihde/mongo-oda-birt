@@ -7,6 +7,18 @@
 
 package org.eclipse.birt.report.data.oda.mongodb.ui.impl;
 
+import java.lang.reflect.InvocationTargetException;
+import java.util.Properties;
+import java.util.Set;
+
+import org.eclipse.birt.report.data.oda.mongodb.impl.Connection;
+import org.eclipse.birt.report.data.oda.mongodb.ui.Activator;
+import org.eclipse.core.runtime.IAdaptable;
+import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Status;
+import org.eclipse.core.runtime.SubMonitor;
+import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.datatools.connectivity.oda.IConnection;
 import org.eclipse.datatools.connectivity.oda.IDriver;
 import org.eclipse.datatools.connectivity.oda.IParameterMetaData;
@@ -16,20 +28,42 @@ import org.eclipse.datatools.connectivity.oda.OdaException;
 import org.eclipse.datatools.connectivity.oda.design.DataSetDesign;
 import org.eclipse.datatools.connectivity.oda.design.DataSetParameters;
 import org.eclipse.datatools.connectivity.oda.design.DesignFactory;
+import org.eclipse.datatools.connectivity.oda.design.ParameterDefinition;
 import org.eclipse.datatools.connectivity.oda.design.ResultSetColumns;
 import org.eclipse.datatools.connectivity.oda.design.ResultSetDefinition;
 import org.eclipse.datatools.connectivity.oda.design.ui.designsession.DesignSessionUtil;
 import org.eclipse.datatools.connectivity.oda.design.ui.wizards.DataSetWizardPage;
+import org.eclipse.jface.operation.IRunnableWithProgress;
 import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.ModifyEvent;
 import org.eclipse.swt.events.ModifyListener;
+import org.eclipse.swt.events.SelectionAdapter;
+import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
+import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Text;
+import org.eclipse.swt.widgets.Tree;
+import org.eclipse.ui.progress.DeferredTreeContentManager;
+import org.eclipse.ui.progress.UIJob;
+import org.eclipse.jface.viewers.ArrayContentProvider;
+import org.eclipse.jface.viewers.BaseLabelProvider;
+import org.eclipse.jface.viewers.DoubleClickEvent;
+import org.eclipse.jface.viewers.IDoubleClickListener;
+import org.eclipse.jface.viewers.IStructuredContentProvider;
+import org.eclipse.jface.viewers.IStructuredSelection;
+import org.eclipse.jface.viewers.ITreeContentProvider;
+import org.eclipse.jface.viewers.LabelProvider;
+import org.eclipse.jface.viewers.TreeViewer;
+import org.eclipse.jface.viewers.Viewer;
+import org.eclipse.swt.widgets.Combo;
+
+import com.mongodb.DBCollection;
 
 /**
  * Auto-generated implementation of an ODA data set designer page
@@ -44,17 +78,23 @@ import org.eclipse.swt.widgets.Text;
 public class CustomDataSetWizardPage extends DataSetWizardPage
 {
 
-    private static final String DEFAULT_QUERY_TEXT = "db.<collection>.find()";
+    private static final String DEFAULT_QUERY_TEXT = "db.collection.find()";
 
 	private static String DEFAULT_MESSAGE = "Define the MongoDB query for the data set";
     
     private transient Text m_queryTextField;
+    private transient TreeViewer m_availableCollectionsTree;
     
     private String formerQueryTxt;
+    private String formerDefaultProjection;
+    
+	private Combo m_defaultProjectionCombo;
 
+    
 	/**
      * Constructor
 	 * @param pageName
+	 * @wbp.parser.constructor
 	 */
 	public CustomDataSetWizardPage( String pageName )
 	{
@@ -91,20 +131,58 @@ public class CustomDataSetWizardPage extends DataSetWizardPage
     private Control createPageControl( Composite parent )
     {
         Composite composite = new Composite( parent, SWT.NONE );
-        composite.setLayout( new GridLayout( 1, false ) );
+        composite.setLayout( new GridLayout( 2, false ) );
         GridData gridData = new GridData( GridData.HORIZONTAL_ALIGN_FILL
                 | GridData.VERTICAL_ALIGN_FILL );
 
         composite.setLayoutData( gridData );
+        
+        Label lblAvailableCollections = new Label(composite, SWT.NONE);
+        lblAvailableCollections.setText("Available Collections:");
 
         Label fieldLabel = new Label( composite, SWT.NONE );
         fieldLabel.setText( "&Query:" );
         
+        m_availableCollectionsTree = new TreeViewer(composite, SWT.BORDER | SWT.VIRTUAL);
+        Tree tree = m_availableCollectionsTree.getTree();
+        tree.setLayoutData(new GridData(SWT.FILL, SWT.FILL, false, true, 1, 1));
+        m_availableCollectionsTree.setContentProvider(new MongoDbCollectionContentProvider());
+        m_availableCollectionsTree.setLabelProvider(new MongoDbCollectionContentProvider.LabelProvider());
+        m_availableCollectionsTree.addDoubleClickListener(new IDoubleClickListener() {
+			
+			public void doubleClick(DoubleClickEvent event) {
+				IStructuredSelection selection = (IStructuredSelection) m_availableCollectionsTree.getSelection();
+				if (selection.getFirstElement() instanceof IAdaptable) {
+					IAdaptable adaptable = (IAdaptable) selection.getFirstElement();
+					DBCollection collection = (DBCollection) adaptable.getAdapter(DBCollection.class);
+					if (collection != null) {
+						m_queryTextField.insert(collection.getName());
+						return;
+					}
+				} else if (selection.getFirstElement() instanceof String) {
+					m_queryTextField.insert((String) selection.getFirstElement());
+					return;
+				}
+			}
+		});
+        
         m_queryTextField = new Text( composite, SWT.BORDER
                 | SWT.V_SCROLL | SWT.H_SCROLL );
         GridData data = new GridData( GridData.FILL_HORIZONTAL );
+        data.verticalAlignment = SWT.FILL;
+        data.grabExcessVerticalSpace = true;
         data.heightHint = 100;
         m_queryTextField.setLayoutData( data );
+        
+        Label lblSchema = new Label(composite, SWT.NONE);
+        lblSchema.setText("Schema Mode:");
+        new Label(composite, SWT.NONE);
+        
+        m_defaultProjectionCombo = new Combo(composite, SWT.READ_ONLY);
+        m_defaultProjectionCombo.setItems(new String[] {"First Document", "All Keys"});
+        m_defaultProjectionCombo.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 1, 1));
+        
+        new Label(composite, SWT.NONE);
         m_queryTextField.addModifyListener( new ModifyListener( ) 
         {
             public void modifyText( ModifyEvent e )
@@ -113,6 +191,7 @@ public class CustomDataSetWizardPage extends DataSetWizardPage
             }
         } );
        
+        
         setPageComplete( false );
         return composite;
     }
@@ -128,7 +207,7 @@ public class CustomDataSetWizardPage extends DataSetWizardPage
          */
 
         // Restores the last saved data set design
-        DataSetDesign dataSetDesign = getInitializationDesign();
+        final DataSetDesign dataSetDesign = getInitializationDesign();
         if( dataSetDesign == null )
             return; // nothing to initialize
 
@@ -145,11 +224,38 @@ public class CustomDataSetWizardPage extends DataSetWizardPage
         validateData();
         setMessage( DEFAULT_MESSAGE );
 
+       
+        if (dataSetDesign.getPrivateProperties() != null) {
+        	formerDefaultProjection = dataSetDesign.getPrivateProperties().getProperty("DefaultProjection");
+        } else {
+        	updateDefaultProjection(dataSetDesign, "first");
+        	formerDefaultProjection = "first";
+        }
+
+        if ("all".equals(formerDefaultProjection)) {
+    		m_defaultProjectionCombo.select(1);
+    	} else {
+            m_defaultProjectionCombo.select(0);
+    	}
+        
+        m_defaultProjectionCombo.addSelectionListener(new SelectionAdapter() {
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				if (m_defaultProjectionCombo.getSelectionIndex() == 1) {
+					updateDefaultProjection(dataSetDesign, "all");
+				} else {
+					updateDefaultProjection(dataSetDesign, "first");
+				}
+				m_availableCollectionsTree.setInput(dataSetDesign);
+			}
+		});
+
         /*
          * To optionally honor the request for an editable or
          * read-only design session, use
          *      isSessionEditable();
          */
+        m_availableCollectionsTree.setInput(dataSetDesign);
 	}
 
     /**
@@ -160,7 +266,28 @@ public class CustomDataSetWizardPage extends DataSetWizardPage
     {
         return m_queryTextField.getText();
     }
+    
+    /**
+     * Obtains the user-defined query text of this data set from page control.
+     * @return query text
+     */
+    private String getDefaultProjection( )
+    {
+    	if (m_defaultProjectionCombo.getSelectionIndex() == 1) {
+			return "all";
+		} else {
+			return "first";
+		}
+    }
 
+
+    private String getDefaultProjection( DataSetDesign design ) {
+    	if ((design.getPrivateProperties() == null) || (design.getPrivateProperties().getProperty("DefaultProjection") == null)) {
+    		return "first";
+    	} else {
+    		return design.getPrivateProperties().getProperty("DefaultProjection");
+    	}
+    }
 	/*
 	 * (non-Javadoc)
 	 * @see org.eclipse.datatools.connectivity.oda.design.ui.wizards.DataSetWizardPage#collectDataSetDesign(org.eclipse.datatools.connectivity.oda.design.DataSetDesign)
@@ -171,10 +298,11 @@ public class CustomDataSetWizardPage extends DataSetWizardPage
             return design;             // no editing was done
         if( ! hasValidData() )
             return null;    // to trigger a design session error status
-        if ( !getQueryText().equals( formerQueryTxt ) )
+        if ( !getQueryText().equals( formerQueryTxt ) || (!getDefaultProjection().equals( formerDefaultProjection )))
 		{
         	savePage( design );
         	formerQueryTxt = design.getQueryText( );
+        	formerDefaultProjection = getDefaultProjection( design );
 		}
         return design;
 	}
@@ -237,52 +365,117 @@ public class CustomDataSetWizardPage extends DataSetWizardPage
 		return canLeave();
 	}
 
+	private Connection openConnection() {
+		IDriver customDriver = new org.eclipse.birt.report.data.oda.mongodb.impl.OdaMongoDriver();
+        
+        // obtain and open a live connection
+		Connection customConn;
+		try {
+			customConn = (Connection) customDriver.getConnection( null );
+			java.util.Properties connProps = 
+		            DesignSessionUtil.getEffectiveDataSourceProperties( 
+		                     getInitializationDesign().getDataSourceDesign() );
+			customConn.open(connProps);
+		} catch (OdaException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			customConn = null;
+		}
+        
+        
+        return customConn;
+	}
+	
+	
 	/**
      * Saves the user-defined value in this page, and updates the specified 
      * dataSetDesign with the latest design definition.
 	 */
-	private void savePage( DataSetDesign dataSetDesign )
+	private void savePage( final DataSetDesign dataSetDesign )
 	{
         // save user-defined query text
-        String queryText = getQueryText();
+        final String queryText = getQueryText();
+        final String defaultProjection = getDefaultProjection();
+        
         dataSetDesign.setQueryText( queryText );
+        updateDefaultProjection(dataSetDesign, defaultProjection);
 
-        // obtain query's current runtime metadata, and maps it to the dataSetDesign
-        IConnection customConn = null;
-        try
-        {
-            // instantiate your custom ODA runtime driver class
-            /* Note: You may need to manually update your ODA runtime extension's
-             * plug-in manifest to export its package for visibility here.
-             */
-            IDriver customDriver = new org.eclipse.birt.report.data.oda.mongodb.impl.OdaMongoDriver();
-            
-            // obtain and open a live connection
-            customConn = customDriver.getConnection( null );
-            java.util.Properties connProps = 
-                DesignSessionUtil.getEffectiveDataSourceProperties( 
-                         getInitializationDesign().getDataSourceDesign() );
-            customConn.open( connProps );
+        final IRunnableWithProgress updateDataSet = new IRunnableWithProgress() {
+			
+			public void run(IProgressMonitor monitor) throws InvocationTargetException,
+					InterruptedException {
+				monitor.beginTask("Updating Data Set Design", IProgressMonitor.UNKNOWN);
+				Connection customConn = openConnection();
+				try {
+					if (customConn != null) {
+					    try {
+							updateDesign(dataSetDesign, customConn, queryText);
+						} catch (OdaException e) {
+							throw new InvocationTargetException(e);
+						}
+					}
+				} finally {
+					monitor.done();
+					if (customConn != null) {
+						closeConnection(customConn);
+					}
+				}
+			}
+        };
+        
 
-            // update the data set design with the 
-            // query's current runtime metadata
-            updateDesign( dataSetDesign, customConn, queryText );
+        if (this.getOdaWizard().getContainer() != null) {
+        	this.getOdaWizard().setNeedsProgressMonitor(true);
+        	try {
+        		this.getOdaWizard().getContainer().run(true, false, updateDataSet);
+        	} catch (InvocationTargetException e) {
+        		// not able to get current metadata, reset previous derived metadata
+        		dataSetDesign.setResultSets( null );
+        		e.printStackTrace();
+        	} catch (InterruptedException e) {
+        		dataSetDesign.setResultSets( null );
+        		e.printStackTrace();
+        	}
+        } else {
+        	Job updateDataSetJob = new Job("Update Data Set") {
+        		@Override
+        		protected IStatus run(IProgressMonitor monitor) {
+        			try {
+        				updateDataSet.run(monitor);
+        			} catch (InvocationTargetException e) {
+        				dataSetDesign.setResultSets( null );
+        				return new Status(IStatus.ERROR, Activator.PLUGIN_ID, "Failed to update data-set", e);
+        			} catch (InterruptedException e) {
+        				dataSetDesign.setResultSets( null );
+        				return Status.CANCEL_STATUS;
+					}
+        			return Status.OK_STATUS;
+        		}
+
+        	};
+        	updateDataSetJob.setUser(true);
+        	updateDataSetJob.setPriority(Job.INTERACTIVE);
+        	updateDataSetJob.schedule();
+        	try {
+        	    updateDataSetJob.join();
+        	} catch (InterruptedException e) {
+        		dataSetDesign.setResultSets( null );
+        		e.printStackTrace();
+        	}
         }
-        catch( OdaException e )
-        {
-            // not able to get current metadata, reset previous derived metadata
-            dataSetDesign.setResultSets( null );
-            dataSetDesign.setParameters( null );
-            
-            e.printStackTrace();
-        }
-        finally
-        {
-            closeConnection( customConn );
-        }
+		
 	}
 
-    /**
+	private void updateDefaultProjection(DataSetDesign dataSetDesign, String value) {
+		org.eclipse.datatools.connectivity.oda.design.Properties privateProperites = dataSetDesign.getPrivateProperties();
+    	if (privateProperites == null) {
+    	    privateProperites = DesignFactory.eINSTANCE.createProperties();
+    	}
+    	privateProperites.setProperty("DefaultProjection", value);
+    	dataSetDesign.setPrivateProperties(privateProperites);
+	}
+	
+	/**
      * Updates the given dataSetDesign with the queryText and its derived metadata
      * obtained from the ODA runtime connection.
      */
@@ -290,7 +483,8 @@ public class CustomDataSetWizardPage extends DataSetWizardPage
                                IConnection conn, String queryText )
         throws OdaException
     {
-        IQuery query = conn.newQuery( null );
+    	IQuery query = conn.newQuery( null );
+    	query.setProperty("DefaultProjection",  getDefaultProjection(dataSetDesign));
         query.prepare( queryText );
         
         // TODO a runtime driver might require a query to first execute before
