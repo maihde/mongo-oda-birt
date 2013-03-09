@@ -374,15 +374,17 @@ public class CustomDataSetWizardPage extends DataSetWizardPage
         
         paramDesign.setDerivedMetaData( true );
 
-        // TODO replace below with data source specific implementation;
-        // hard-coded parameter's default value for demo purpose
-        /*if( paramDesign.getParameterDefinitions().size() > 0 )
-        {
-            ParameterDefinition paramDef = 
-                (ParameterDefinition) paramDesign.getParameterDefinitions().get( 0 );
-            if( paramDef != null )
-                paramDef.setDefaultScalarValue( "dummy default value" );
-        }*/
+        for (ParameterDefinition paramDef :  paramDesign.getParameterDefinitions()) {
+        	if (paramDef.getAttributes().getName().equals("SortCriteria")) {
+        		if (paramDef.getDefaultValues() == null) {
+        			paramDef.setDefaultScalarValue("{}");
+        		}
+        	} else if (paramDef.getAttributes().getName().equals("FilterCriteria")) {
+        		if (paramDef.getDefaultValues() == null) {
+        			paramDef.setDefaultScalarValue("{}");
+        		}
+        	}
+        }
     }
 
     /**
