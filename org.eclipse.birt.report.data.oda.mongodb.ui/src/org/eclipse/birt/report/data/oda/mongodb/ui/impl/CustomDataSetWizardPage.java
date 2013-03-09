@@ -49,6 +49,8 @@ public class CustomDataSetWizardPage extends DataSetWizardPage
 	private static String DEFAULT_MESSAGE = "Define the MongoDB query for the data set";
     
     private transient Text m_queryTextField;
+    
+    private String formerQueryTxt;
 
 	/**
      * Constructor
@@ -130,13 +132,13 @@ public class CustomDataSetWizardPage extends DataSetWizardPage
         if( dataSetDesign == null )
             return; // nothing to initialize
 
-        String queryText = dataSetDesign.getQueryText();
-        if( queryText == null )
+        this.formerQueryTxt = dataSetDesign.getQueryText();
+        if( formerQueryTxt == null )
             return; // nothing to initialize
 
         // initialize control
-        if ((queryText != null) && (queryText.trim().length() > 0)) {
-            m_queryTextField.setText( queryText );
+        if ((formerQueryTxt != null) && (formerQueryTxt.trim().length() > 0)) {
+            m_queryTextField.setText( formerQueryTxt );
         } else {
         	m_queryTextField.setText( DEFAULT_QUERY_TEXT );
         }
@@ -169,7 +171,11 @@ public class CustomDataSetWizardPage extends DataSetWizardPage
             return design;             // no editing was done
         if( ! hasValidData() )
             return null;    // to trigger a design session error status
-        savePage( design );
+        if ( !getQueryText().equals( formerQueryTxt ) )
+		{
+        	savePage( design );
+        	formerQueryTxt = design.getQueryText( );
+		}
         return design;
 	}
 
