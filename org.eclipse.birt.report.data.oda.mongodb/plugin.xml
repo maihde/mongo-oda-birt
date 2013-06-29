@@ -104,8 +104,7 @@
                   canInherit="true"
                   defaultDisplayName="Filter"
                   isEncryptable="false"
-                  name="FilterCriteria"
-                  type="string">
+                  name="FilterCriteria">
             </property>
             <property
                   allowsEmptyValueAsNull="true"

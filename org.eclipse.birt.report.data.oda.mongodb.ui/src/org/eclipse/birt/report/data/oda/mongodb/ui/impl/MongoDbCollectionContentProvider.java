@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.eclipse.birt.report.data.oda.mongodb.impl.Connection;
+import org.eclipse.birt.report.data.oda.mongodb.ui.Activator;
 import org.eclipse.core.runtime.IAdaptable;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.SubMonitor;
@@ -16,9 +17,12 @@ import org.eclipse.datatools.connectivity.oda.design.DataSourceDesign;
 import org.eclipse.datatools.connectivity.oda.design.ParameterDefinition;
 import org.eclipse.datatools.connectivity.oda.design.ui.designsession.DesignSessionUtil;
 import org.eclipse.jface.resource.ImageDescriptor;
+import org.eclipse.jface.resource.ImageRegistry;
+import org.eclipse.jface.resource.JFaceResources;
 import org.eclipse.jface.viewers.AbstractTreeViewer;
 import org.eclipse.jface.viewers.ITreeContentProvider;
 import org.eclipse.jface.viewers.Viewer;
+import org.eclipse.swt.graphics.Image;
 import org.eclipse.ui.progress.DeferredTreeContentManager;
 import org.eclipse.ui.progress.IDeferredWorkbenchAdapter;
 import org.eclipse.ui.progress.IElementCollector;
@@ -32,6 +36,23 @@ import com.mongodb.MapReduceOutput;
 public class MongoDbCollectionContentProvider implements ITreeContentProvider {
 
 	private DeferredTreeContentManager contentManager;
+	
+
+	private static final String DATA_SOURCE_ICON = "data_source";
+	private static final String COLLECTION_ICON = "collection";
+	private static final String COLUMN_ICON = "column";
+	
+	private static final ImageRegistry reg = JFaceResources.getImageRegistry( );
+	
+	static
+	{
+		reg.put( DATA_SOURCE_ICON, ImageDescriptor.createFromFile( Activator.class,
+				"icons/data_source.gif" ) );//$NON-NLS-1$
+		reg.put( COLLECTION_ICON, ImageDescriptor.createFromFile( Activator.class,
+				"icons/collection.gif" ) );//$NON-NLS-1$
+		reg.put( COLUMN_ICON, ImageDescriptor.createFromFile( Activator.class,
+				"icons/column.gif" ) );//$NON-NLS-1$
+	}
 	
 	public void dispose() {
 		
@@ -62,6 +83,48 @@ public class MongoDbCollectionContentProvider implements ITreeContentProvider {
 	}
 
 	public static class LabelProvider extends org.eclipse.jface.viewers.LabelProvider {
+
+		private Image dataSourceIcon;
+		private Image collectionIcon;
+		private Image columnIcon;
+
+		public LabelProvider() {
+			super();
+			dataSourceIcon = MongoDbCollectionContentProvider.reg.getDescriptor(DATA_SOURCE_ICON).createImage();
+			collectionIcon = MongoDbCollectionContentProvider.reg.getDescriptor(COLLECTION_ICON).createImage();
+			columnIcon = MongoDbCollectionContentProvider.reg.getDescriptor(COLUMN_ICON).createImage();
+		}
+
+		@Override
+		public void dispose() {
+			if ((dataSourceIcon != null) && (!dataSourceIcon.isDisposed())) {
+				dataSourceIcon.dispose();
+			}
+			if ((collectionIcon != null) && (!collectionIcon.isDisposed())) {
+				collectionIcon.dispose();
+			}
+			if ((columnIcon != null) && (!columnIcon.isDisposed())) {
+				columnIcon.dispose();
+			}
+			super.dispose();
+		}
+
+		@Override
+		public Image getImage(Object element) {
+			if (element instanceof IAdaptable) {
+				DataSourceDesign ds = (DataSourceDesign) ((IAdaptable) element).getAdapter(DataSourceDesign.class);
+				if (ds != null) {
+					return dataSourceIcon;
+				}
+				DBCollection collection = (DBCollection)  ((IAdaptable) element).getAdapter(DBCollection.class);
+				if (collection != null) {
+					return collectionIcon;
+				}
+			} else if (element instanceof String) {
+				return columnIcon;
+			}
+			return super.getImage(element);
+		}
 
 		@Override
 		public String getText(Object element) {
@@ -104,7 +167,11 @@ public class MongoDbCollectionContentProvider implements ITreeContentProvider {
 		}
 
 		public ImageDescriptor getImageDescriptor(Object object) {
-			// TODO Auto-generated method stub
+			if (object instanceof DataSourceDesign) {
+				return MongoDbCollectionContentProvider.reg.getDescriptor(DATA_SOURCE_ICON);
+			} else if (object instanceof DBCollection) {
+				return MongoDbCollectionContentProvider.reg.getDescriptor(COLLECTION_ICON);
+			}
 			return null;
 		}
 
@@ -203,8 +270,10 @@ public class MongoDbCollectionContentProvider implements ITreeContentProvider {
 		}
 
 		public ImageDescriptor getImageDescriptor(Object object) {
-			// TODO Auto-generated method stub
-			return null;
+			if (object instanceof DBCollection) {
+				return MongoDbCollectionContentProvider.reg.getDescriptor(COLLECTION_ICON);
+			}
+			return MongoDbCollectionContentProvider.reg.getDescriptor(COLUMN_ICON);
 		}
 
 		public String getLabel(Object o) {

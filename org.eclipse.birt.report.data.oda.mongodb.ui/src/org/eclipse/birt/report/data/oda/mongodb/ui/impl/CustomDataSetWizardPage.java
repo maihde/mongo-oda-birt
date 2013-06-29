@@ -11,6 +11,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.Properties;
 import java.util.Set;
 
+import org.eclipse.birt.report.data.oda.jdbc.ui.editors.SQLPartitionScanner;
+import org.eclipse.birt.report.data.oda.jdbc.ui.editors.SQLSourceViewerConfiguration;
 import org.eclipse.birt.report.data.oda.mongodb.impl.Connection;
 import org.eclipse.birt.report.data.oda.mongodb.ui.Activator;
 import org.eclipse.core.runtime.IAdaptable;
@@ -35,6 +37,15 @@ import org.eclipse.datatools.connectivity.oda.design.ui.designsession.DesignSess
 import org.eclipse.datatools.connectivity.oda.design.ui.wizards.DataSetWizardPage;
 import org.eclipse.jface.operation.IRunnableWithProgress;
 import org.eclipse.jface.resource.ImageDescriptor;
+import org.eclipse.jface.text.BadLocationException;
+import org.eclipse.jface.text.Document;
+import org.eclipse.jface.text.IDocument;
+import org.eclipse.jface.text.rules.FastPartitioner;
+import org.eclipse.jface.text.source.CompositeRuler;
+import org.eclipse.jface.text.source.LineNumberChangeRulerColumn;
+import org.eclipse.jface.text.source.LineNumberRulerColumn;
+import org.eclipse.jface.text.source.SourceViewer;
+import org.eclipse.jface.text.source.SourceViewerConfiguration;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.ModifyEvent;
 import org.eclipse.swt.events.ModifyListener;
@@ -82,7 +93,8 @@ public class CustomDataSetWizardPage extends DataSetWizardPage
 
 	private static String DEFAULT_MESSAGE = "Define the MongoDB query for the data set";
     
-    private transient Text m_queryTextField;
+	private Document doc;
+    private transient SourceViewer m_queryTextField;
     private transient TreeViewer m_availableCollectionsTree;
     
     private String formerQueryTxt;
@@ -156,23 +168,59 @@ public class CustomDataSetWizardPage extends DataSetWizardPage
 					IAdaptable adaptable = (IAdaptable) selection.getFirstElement();
 					DBCollection collection = (DBCollection) adaptable.getAdapter(DBCollection.class);
 					if (collection != null) {
-						m_queryTextField.insert(collection.getName());
+						String queryText = doc.get().trim();
+						if (queryText.startsWith("db.")) {
+							int find_index = queryText.indexOf(".find(");
+							if (find_index == -1) {
+								try {
+									doc.replace(3, 0, collection.getName());
+								} catch (BadLocationException e) {
+									// TODO Auto-generated catch block
+									e.printStackTrace();
+								}
+							} else {
+								try {
+									doc.replace(3, find_index-3, collection.getName());
+								} catch (BadLocationException e) {
+									// TODO Auto-generated catch block
+									e.printStackTrace();
+								}
+							}
+						} else {
+							 m_queryTextField.getTextWidget().insert(collection.getName());
+						}
 						return;
 					}
 				} else if (selection.getFirstElement() instanceof String) {
-					m_queryTextField.insert((String) selection.getFirstElement());
+					 m_queryTextField.getTextWidget().insert((String) selection.getFirstElement());
 					return;
 				}
 			}
 		});
         
-        m_queryTextField = new Text( composite, SWT.BORDER
-                | SWT.V_SCROLL | SWT.H_SCROLL );
+        CompositeRuler ruler = new CompositeRuler();
+        LineNumberRulerColumn lineNumbers = new LineNumberRulerColumn();
+        ruler.addDecorator( 0, lineNumbers);
+       
+		
+        m_queryTextField = new SourceViewer( composite, ruler,
+        		SWT.BORDER | SWT.V_SCROLL | SWT.H_SCROLL );
+        
+        doc = new Document( );
+        
+        m_queryTextField.setDocument( doc );
+        SourceViewerConfiguration svc = new MongoSourceViewerConfiguration( null, 5000, false);
+        m_queryTextField.configure( svc );
+        
+        FastPartitioner partitioner = new FastPartitioner( new MongoPartitionScanner( ), svc.getConfiguredContentTypes(m_queryTextField) );
+		partitioner.connect( doc );
+		doc.setDocumentPartitioner( partitioner );
+		
         GridData data = new GridData( GridData.FILL_HORIZONTAL );
         data.verticalAlignment = SWT.FILL;
         data.grabExcessVerticalSpace = true;
         data.heightHint = 100;
-        m_queryTextField.setLayoutData( data );
+        m_queryTextField.getControl().setLayoutData( data );
         
         Label lblSchema = new Label(composite, SWT.NONE);
         lblSchema.setText("Schema Mode:");
@@ -183,7 +231,7 @@ public class CustomDataSetWizardPage extends DataSetWizardPage
         m_defaultProjectionCombo.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 1, 1));
         
         new Label(composite, SWT.NONE);
-        m_queryTextField.addModifyListener( new ModifyListener( ) 
+        m_queryTextField.getTextWidget().addModifyListener( new ModifyListener( ) 
         {
             public void modifyText( ModifyEvent e )
             {
@@ -217,9 +265,9 @@ public class CustomDataSetWizardPage extends DataSetWizardPage
 
         // initialize control
         if ((formerQueryTxt != null) && (formerQueryTxt.trim().length() > 0)) {
-            m_queryTextField.setText( formerQueryTxt );
+        	 doc.set( formerQueryTxt );
         } else {
-        	m_queryTextField.setText( DEFAULT_QUERY_TEXT );
+        	 doc.set( DEFAULT_QUERY_TEXT );
         }
         validateData();
         setMessage( DEFAULT_MESSAGE );
@@ -264,7 +312,7 @@ public class CustomDataSetWizardPage extends DataSetWizardPage
      */
     private String getQueryText( )
     {
-        return m_queryTextField.getText();
+        return  m_queryTextField.getTextWidget().getText();
     }
     
     /**
