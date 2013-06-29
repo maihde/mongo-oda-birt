@@ -120,7 +120,10 @@ public class Query implements IQuery {
 					throw new OdaException(Messages.getString("query_INVALID_COLLECTION_NAME"));
 				}
 				
-				int query_end = m_preparedText.indexOf(")", find_index+6);
+				int query_end = m_preparedText.lastIndexOf(')');
+				if (query_end < (find_index+6)) {
+					throw new OdaException(Messages.getString("query_INVALID_FIND_QUERY"));
+				}
 				String find_statement =  m_preparedText.substring(find_index+6, query_end);
 				try {
 				    List<DBObject> fo = (List<DBObject>) JSON.parse("[" + find_statement + "]");
