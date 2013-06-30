@@ -11,6 +11,8 @@ import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -87,6 +89,81 @@ public class Query implements IQuery {
 		this.defaultProjection = value;
 	}
 
+	/**
+	 * Looks for string values that appear in one of the following
+	 * formats:
+	 * 
+	 *    ISO Format: 1990-12-01T04:30:99Z
+	 *    RFC2822 / IETF: Mon, 25 Dec 1995 13:30:00 GMT
+	 *    BIRT DateTime: Fri Feb 01 00:00:00 GMT 1924
+	 *    
+	 *  It then coverts them to a Date object so that queries such as
+	 *  
+	 *      find({"date": {"$gt": "1990-12-01T04:40:99Z"}})
+	 *      
+	 *  can be written.  To prevent the conversion of the string, surround it with
+	 *  quotes, such as:
+	 *  
+	 *      find({"date": {"$gt": "'1990-12-01T04:40:99Z'"}})
+	 *  
+	 * @param object
+	 */
+	final SimpleDateFormat ISO_FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
+	final String ISO_MATCH = "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z";
+	
+	final SimpleDateFormat RFC2822_FORMAT = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss 'GMT'");
+	final String RFC2822_MATCH = "\\w{3} \\d{2} \\w{3} \\d{4} \\d{2}:\\d{2}:\\d{2} GMT";
+			
+	final SimpleDateFormat BIRT_FORMAT = new SimpleDateFormat("EEE MMM dd HH:mm:ss 'GMT' yyyy");
+	final String BIRT_MATCH = "\\w{3} \\w{3} \\d{2} \\d{2}:\\d{2}:\\d{2} GMT \\d{4}";
+	
+	final SimpleDateFormat DATE = new SimpleDateFormat("yyyy-MM-dd");
+	final String DATE_MATCH = "\\d{4}-\\d{2}-\\d{2}";
+	
+	private void convertDates(DBObject o) {
+		for (final String k : o.keySet()) {
+			final Object v = o.get(k);
+			if (v instanceof DBObject) {
+				convertDates((DBObject) v); // recurse 
+			} else if (v instanceof String) {
+				final String s = (String) v;
+				
+				if (s.matches(ISO_MATCH)) {
+					try {
+						java.util.Date d = ISO_FORMAT.parse(s);
+						o.put(k, d);
+					} catch (ParseException e) {
+						// leave as a string
+						e.printStackTrace();
+					}
+				} else if (s.matches(RFC2822_MATCH)) {
+					try {
+						java.util.Date d = RFC2822_FORMAT.parse(s);
+						o.put(k, d);
+					} catch (ParseException e) {
+						// leave as a string
+					}
+				} else if (s.matches(BIRT_MATCH)) {
+					try {
+						java.util.Date d = BIRT_FORMAT.parse(s);
+						o.put(k, d);
+					} catch (ParseException e) {
+						// leave as a string
+					}
+				} else if (s.matches(DATE_MATCH)) {
+					try {
+						java.util.Date d = DATE.parse(s);
+						o.put(k, d);
+					} catch (ParseException e) {
+						// leave as a string
+						e.printStackTrace();
+					}
+				} 
+			}
+		}
+		
+	}
+	
 	/*
 	 * @see
 	 * org.eclipse.datatools.connectivity.oda.IQuery#prepare(java.lang.String)
@@ -133,6 +210,7 @@ public class Query implements IQuery {
 					
 					if (fo.size() >= 1) {
 						defaultFilterClause = fo.get(0);
+						convertDates(defaultFilterClause);
 					}
 					if (fo.size() == 2) {
 						projectionClause = fo.get(1);
@@ -292,6 +370,7 @@ public class Query implements IQuery {
 						filterCriteria = filterCriteria.substring(1, filterCriteria.length()-1);
 					}
 					filterClause = (DBObject) JSON.parse(filterCriteria);
+					convertDates(filterClause);
 				} catch (RuntimeException e) {
 					throw new OdaException(Messages.getString("query_INVALID_FILTERCRITERIA"));
 				}
